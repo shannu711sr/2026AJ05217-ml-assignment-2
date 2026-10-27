@@ -1,0 +1,15 @@
+
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# macOS files
+.DS_Store
