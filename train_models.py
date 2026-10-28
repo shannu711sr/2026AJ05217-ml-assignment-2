@@ -1,4 +1,5 @@
 import pandas as pd
+import joblib
 
 from pathlib import Path
 from sklearn.model_selection import train_test_split
@@ -121,3 +122,15 @@ print(classification_report(
     target_names=["No Churn", "Churn"],
     zero_division=0
 ))
+
+# Save the trained Logistic Regression model
+from pathlib import Path
+
+Path("models").mkdir(exist_ok=True)
+
+joblib.dump(
+    logistic_model,
+    "models/logistic_regression.joblib"
+)
+
+print("\nLogistic Regression model saved successfully.")
