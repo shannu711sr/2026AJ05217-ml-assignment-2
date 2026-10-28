@@ -8,6 +8,12 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+
+'''
+-------------------------------- LOGISTIC REGRESSION ---------------------------------
+'''
+
+
 # Loading dataset
 csv_files = list(Path("data").glob("*.csv"))
 
@@ -134,3 +140,71 @@ joblib.dump(
 )
 
 print("\nLogistic Regression model saved successfully.")
+
+
+'''
+-------------------------------- DECISION TREE ---------------------------------
+'''
+
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import (
+    accuracy_score,
+    roc_auc_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    matthews_corrcoef,
+    confusion_matrix,
+    classification_report
+)
+import joblib
+from pathlib import Path
+
+# Create the Decision Tree pipeline
+decision_tree_model = Pipeline([
+    ("preprocessor", preprocessor),
+    ("classifier", DecisionTreeClassifier(
+        criterion="gini",
+        max_depth=5,
+        min_samples_split=10,
+        min_samples_leaf=5,
+        random_state=42
+    ))
+])
+
+# Train the model using the existing training data
+decision_tree_model.fit(X_train, y_train)
+
+# Predict on the existing test data
+y_pred_dt = decision_tree_model.predict(X_test)
+y_prob_dt = decision_tree_model.predict_proba(X_test)[:, 1]
+
+# Calculate evaluation metrics
+print("\n" + "=" * 45)
+print("DECISION TREE CLASSIFIER RESULTS")
+print("=" * 45)
+
+print("Accuracy:", round(accuracy_score(y_test, y_pred_dt), 4))
+print("AUC:", round(roc_auc_score(y_test, y_prob_dt), 4))
+print("Precision:", round(precision_score(y_test, y_pred_dt, zero_division=0), 4))
+print("Recall:", round(recall_score(y_test, y_pred_dt, zero_division=0), 4))
+print("F1-score:", round(f1_score(y_test, y_pred_dt, zero_division=0), 4))
+print("MCC:", round(matthews_corrcoef(y_test, y_pred_dt), 4))
+
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_pred_dt))
+
+print("\nClassification Report:")
+print(classification_report(
+    y_test,
+    y_pred_dt,
+    target_names=["No Churn", "Churn"],
+    zero_division=0
+))
+
+# Save the trained model
+Path("models").mkdir(exist_ok=True)
+joblib.dump(decision_tree_model, "models/decision_tree.joblib")
+
+print("\nDecision Tree model saved to models/decision_tree.joblib")
