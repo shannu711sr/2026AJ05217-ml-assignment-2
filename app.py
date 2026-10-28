@@ -16,6 +16,7 @@ from sklearn.metrics import (
     classification_report
 )
 
+# PAGE CONFIGURATION
 st.set_page_config(
     page_title="Customer Churn Classification",
     page_icon="🤖",
@@ -24,38 +25,46 @@ st.set_page_config(
 
 st.title("Customer Churn Classification")
 st.write(
-    "Evaluate the saved Logistic Regression model "
-    "using the test portion of our customer churn dataset."
+    "Select a trained classification model to evaluate "
+    "customer churn using the existing dataset."
 )
 
-# 1. Locate the existing dataset and saved model
+# FILE PATHS
 data_path = Path("data/IT_customer_churn.csv")
-model_path = Path("models/logistic_regression.joblib")
 
+model_paths = {
+    "Logistic Regression": Path("models/logistic_regression.joblib"),
+    "Decision Tree": Path("models/decision_tree.joblib")
+}
+
+# CHECK REQUIRED FILES
 if not data_path.exists():
     st.error("Dataset not found: data/IT_customer_churn.csv")
     st.stop()
 
-if not model_path.exists():
-    st.error("Saved Logistic Regression model not found.")
-    st.stop()
-
-# 2. Load the existing dataset
 df = pd.read_csv(data_path)
 
-# Match the data preparation used during training
+required_columns = {"Churn", "TotalCharges"}
+
+if not required_columns.issubset(df.columns):
+    st.error("The dataset is missing required columns.")
+    st.stop()
+
+
+# PREPARE DATA
 df["TotalCharges"] = pd.to_numeric(
-    df["TotalCharges"], errors="coerce"
+    df["TotalCharges"],
+    errors="coerce"
 )
 
 X = df.drop(columns=["Churn"])
 y = df["Churn"].map({"No": 0, "Yes": 1})
 
 if y.isnull().any():
-    st.error("Unexpected values found in the Churn column.")
+    st.error("Unexpected or missing values found in the Churn column.")
     st.stop()
 
-# 3. Recreate the same test split used during training
+# Use the same split as train_models.py
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -64,56 +73,103 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y
 )
 
-# 4. Load the already-trained model (no retraining)
-model = joblib.load(model_path)
-
-st.success("Saved Logistic Regression model loaded successfully.")
-
+# DATASET OVERVIEW
 st.subheader("Dataset Overview")
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Total customers", f"{len(df):,}")
-col2.metric("Training customers", f"{len(X_train):,}")
-col3.metric("Test customers", f"{len(X_test):,}")
+
+col1.metric("Total Customers", f"{len(df):,}")
+col2.metric("Training Customers", f"{len(X_train):,}")
+col3.metric("Test Customers", f"{len(X_test):,}")
 
 with st.expander("Preview the existing dataset"):
     st.dataframe(df.head(10), use_container_width=True)
 
-# 5. Evaluate on the held-out test data
-y_pred = model.predict(X_test)
-y_prob = model.predict_proba(X_test)[:, 1]
+# MODEL SELECTION
+st.subheader("Select Classification Model")
 
-st.subheader("Logistic Regression Evaluation")
+selected_model_name = st.selectbox(
+    "Choose a model",
+    options=list(model_paths.keys())
+)
+
+selected_model_path = model_paths[selected_model_name]
+
+if not selected_model_path.exists():
+    st.error(
+        f"Saved model not found: {selected_model_path}"
+    )
+    st.stop()
+
+# Load the selected saved model; do not retrain it
+try:
+    model = joblib.load(selected_model_path)
+except Exception as error:
+    st.error(f"Could not load the selected model: {error}")
+    st.stop()
+
+st.success(f"{selected_model_name} model loaded successfully.")
+
+# MODEL PREDICTIONS
+try:
+    y_pred = model.predict(X_test)
+
+    if hasattr(model, "predict_proba"):
+        y_prob = model.predict_proba(X_test)[:, 1]
+    else:
+        y_prob = None
+
+except Exception as error:
+    st.error(f"Could not generate predictions: {error}")
+    st.stop()
+
+
+# EVALUATION METRICS
+st.subheader(f"{selected_model_name} Evaluation")
 
 metrics = {
     "Accuracy": accuracy_score(y_test, y_pred),
-    "AUC": roc_auc_score(y_test, y_prob),
-    "Precision": precision_score(y_test, y_pred, zero_division=0),
-    "Recall": recall_score(y_test, y_pred, zero_division=0),
-    "F1-score": f1_score(y_test, y_pred, zero_division=0),
+    "Precision": precision_score(
+        y_test, y_pred, zero_division=0
+    ),
+    "Recall": recall_score(
+        y_test, y_pred, zero_division=0
+    ),
+    "F1-score": f1_score(
+        y_test, y_pred, zero_division=0
+    ),
     "MCC": matthews_corrcoef(y_test, y_pred)
 }
 
-cols = st.columns(3)
+if y_prob is not None:
+    metrics["AUC"] = roc_auc_score(y_test, y_prob)
 
-for i, (name, value) in enumerate(metrics.items()):
-    cols[i % 3].metric(name, f"{value:.4f}")
+metric_columns = st.columns(3)
 
-# 6. Confusion matrix
+for index, (metric_name, metric_value) in enumerate(metrics.items()):
+    metric_columns[index % 3].metric(
+        metric_name,
+        f"{metric_value:.4f}"
+    )
+
+# CONFUSION MATRIX
 st.subheader("Confusion Matrix")
 
-cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
-
-st.dataframe(
-    pd.DataFrame(
-        cm,
-        index=["Actual No Churn", "Actual Churn"],
-        columns=["Predicted No Churn", "Predicted Churn"]
-    ),
-    use_container_width=True
+cm = confusion_matrix(
+    y_test,
+    y_pred,
+    labels=[0, 1]
 )
 
-# 7. Classification report
+cm_df = pd.DataFrame(
+    cm,
+    index=["Actual No Churn", "Actual Churn"],
+    columns=["Predicted No Churn", "Predicted Churn"]
+)
+
+st.dataframe(cm_df, use_container_width=True)
+
+# CLASSIFICATION REPORT
 st.subheader("Classification Report")
 
 report = classification_report(
@@ -125,7 +181,5 @@ report = classification_report(
     zero_division=0
 )
 
-st.dataframe(
-    pd.DataFrame(report).transpose(),
-    use_container_width=True
-)
+report_df = pd.DataFrame(report).transpose()
+st.dataframe(report_df, use_container_width=True)
