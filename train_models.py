@@ -208,3 +208,64 @@ Path("models").mkdir(exist_ok=True)
 joblib.dump(decision_tree_model, "models/decision_tree.joblib")
 
 print("\nDecision Tree model saved to models/decision_tree.joblib")
+
+'''
+-------------------------------- KNN - K Nearst Neighbors ---------------------------------
+'''
+
+
+from sklearn.neighbors import KNeighborsClassifier
+
+# Create the KNN pipeline
+knn_model = Pipeline([
+    ("preprocessor", preprocessor),
+    ("classifier", KNeighborsClassifier(
+        n_neighbors=5,
+        weights="uniform",
+        metric="minkowski",
+        p=2
+    ))
+])
+
+# Train the model using the existing training data
+knn_model.fit(X_train, y_train)
+
+# Predict on the existing test data
+y_pred_knn = knn_model.predict(X_test)
+y_prob_knn = knn_model.predict_proba(X_test)[:, 1]
+
+# Calculate evaluation metrics
+print("\n" + "=" * 45)
+print("K-NEAREST NEIGHBORS (KNN) RESULTS")
+print("=" * 45)
+
+print("Accuracy:", round(accuracy_score(y_test, y_pred_knn), 4))
+print("AUC:", round(roc_auc_score(y_test, y_prob_knn), 4))
+print("Precision:", round(
+    precision_score(y_test, y_pred_knn, zero_division=0), 4
+))
+print("Recall:", round(
+    recall_score(y_test, y_pred_knn, zero_division=0), 4
+))
+print("F1-score:", round(
+    f1_score(y_test, y_pred_knn, zero_division=0), 4
+))
+print("MCC:", round(matthews_corrcoef(y_test, y_pred_knn), 4))
+
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_pred_knn))
+
+print("\nClassification Report:")
+print(classification_report(
+    y_test,
+    y_pred_knn,
+    labels=[0, 1],
+    target_names=["No Churn", "Churn"],
+    zero_division=0
+))
+
+# Save the trained model
+Path("models").mkdir(exist_ok=True)
+joblib.dump(knn_model, "models/knn.joblib")
+
+print("\nKNN model saved to models/knn.joblib")
