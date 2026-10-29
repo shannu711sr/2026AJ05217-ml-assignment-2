@@ -1,27 +1,46 @@
 
 [theme]
-base = "light"
-primaryColor = "#0D9488"
-backgroundColor = "#F4F7FB"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#172033"
+# Dark theme with Plum & Lavender accents
+base = "dark"
+
+# Primary interactive accent
+primaryColor = "#B794F6"
+
+# Main application background
+backgroundColor = "#211A2E"
+
+# Cards, widgets and content surfaces
+secondaryBackgroundColor = "#302640"
+
+# Main text
+textColor = "#F5F0FA"
+
+# Typography
 font = "sans serif"
-baseRadius = "medium"
-buttonRadius = "medium"
+
+# Rounded components and subtle borders
+baseRadius = "0.75rem"
+buttonRadius = "0.5rem"
 showWidgetBorder = true
 showSidebarBorder = true
+borderColor = "#4B3B5C"
 
-[theme.sidebar]
-backgroundColor = "#101B33"
-secondaryBackgroundColor = "#1A2945"
-textColor = "#F1F5F9"
-primaryColor = "#2DD4BF"
-
-[theme.light]
+# Chart palette for model comparisons
 chartCategoricalColors = [
-    "#0D9488",
-    "#3B82F6",
-    "#8B5CF6",
-    "#F59E0B",
-    "#EF4444"
+    "#B794F6",
+    "#D96C9D",
+    "#8B9CF6",
+    "#67D5C0",
+    "#F2C879",
+    "#E87979",
+    "#A8A0B8"
 ]
+
+# Main dashboard sidebar
+[theme.sidebar]
+backgroundColor = "#30213F"
+secondaryBackgroundColor = "#3D2D50"
+textColor = "#F5F0FA"
+primaryColor = "#D6BCFA"
+borderColor = "#574365"
+showWidgetBorder = true
