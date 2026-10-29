@@ -20,7 +20,8 @@ from sklearn.metrics import (
 st.set_page_config(
     page_title="Customer Churn Classification",
     page_icon="🤖",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 st.title("Customer Churn Classification")
@@ -91,9 +92,18 @@ with st.expander("Preview the existing dataset"):
 # MODEL SELECTION
 st.subheader("Select Classification Model")
 
-selected_model_name = st.selectbox(
+# Left sidebar
+st.sidebar.title("Churn Dashboard")
+st.sidebar.caption("Model Selection")
+
+selected_model_name = st.sidebar.selectbox(
     "Choose a model",
     options=list(model_paths.keys())
+)
+
+st.sidebar.divider()
+st.sidebar.caption(
+    "Select a trained model to view its evaluation results."
 )
 
 selected_model_path = model_paths[selected_model_name]
