@@ -328,5 +328,61 @@ print("\nNaive Bayes model saved to models/naive_bayes.joblib")
 
 
 '''
--------------------------------- Gaussian Naive Bayes ---------------------------------
+-------------------------------- Support Vector Machine ---------------------------------
 '''
+
+from sklearn.svm import SVC
+
+# Create the SVM pipeline
+svm_model = Pipeline([
+    ("preprocessor", preprocessor),
+    ("classifier", SVC(
+        kernel="rbf",
+        C=1.0,
+        probability=True,
+        random_state=42
+    ))
+])
+
+# Train the model using the existing training data
+svm_model.fit(X_train, y_train)
+
+# Predict on the existing test data
+y_pred_svm = svm_model.predict(X_test)
+y_prob_svm = svm_model.predict_proba(X_test)[:, 1]
+
+# Calculate evaluation metrics
+print("\n" + "=" * 45)
+print("SUPPORT VECTOR MACHINE (SVM) RESULTS")
+print("=" * 45)
+
+print("Accuracy:", round(accuracy_score(y_test, y_pred_svm), 4))
+print("AUC:", round(roc_auc_score(y_test, y_prob_svm), 4))
+print("Precision:", round(
+    precision_score(y_test, y_pred_svm, zero_division=0), 4
+))
+print("Recall:", round(
+    recall_score(y_test, y_pred_svm, zero_division=0), 4
+))
+print("F1-score:", round(
+    f1_score(y_test, y_pred_svm, zero_division=0), 4
+))
+print("MCC:", round(matthews_corrcoef(y_test, y_pred_svm), 4))
+
+print("\nConfusion Matrix:")
+print(confusion_matrix(y_test, y_pred_svm))
+
+print("\nClassification Report:")
+print(classification_report(
+    y_test,
+    y_pred_svm,
+    labels=[0, 1],
+    target_names=["No Churn", "Churn"],
+    zero_division=0
+))
+
+# Save the trained model
+Path("models").mkdir(exist_ok=True)
+joblib.dump(svm_model, "models/svm.joblib")
+
+print("\nSVM model saved to models/svm.joblib")
