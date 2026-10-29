@@ -35,9 +35,10 @@ data_path = Path("data/IT_customer_churn.csv")
 model_paths = {
     "Logistic Regression": Path("models/logistic_regression.joblib"),
     "Decision Tree": Path("models/decision_tree.joblib"),
-    "KNN": Path("models/knn.joblib")
+    "KNN": Path("models/knn.joblib"),
+    "Naive Bayes": Path("models/naive_bayes.joblib"),
+    "SVM": Path("models/svm.joblib")
 }
-
 
 # CHECK REQUIRED FILES
 if not data_path.exists():
