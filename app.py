@@ -407,8 +407,8 @@ with st.sidebar:
     <div class="brand">
       <div class="brand-icon">✦</div>
       <div>
-        <div class="brand-title">ChurnLab</div>
-        <div class="brand-subtitle">ML Analytics</div>
+        <div class="brand-title">Binary Classifier Studio</div>
+        <div class="brand-subtitle">A Binary Classification Platform</div>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -625,7 +625,7 @@ st.markdown(
 )
 
 st.markdown(
-    '<div class="page-title">Customer Churn Analytics</div>',
+    '<div class="page-title">Binary Classifier Analytics</div>',
     unsafe_allow_html=True
 )
 
@@ -1067,7 +1067,7 @@ with comparison_tab:
 st.divider()
 
 st.caption(
-    "ChurnLab · "
+    "Binary Classifier · "
     + (
         "Uploaded dataset evaluated directly; no retraining."
         if uploaded_file is not None
