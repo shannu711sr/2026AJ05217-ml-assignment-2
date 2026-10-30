@@ -96,3 +96,21 @@ The models were evaluated using the following metrics:
 - **Precision:** Measures how many predicted positive cases were actually positive.
 - **Recall
 
+| ML Model Name | Accuracy | AUC | Precision | Recall | F1-score | MCC |
+|---|---:|---:|---:|---:|---:|---:|
+| Logistic Regression | 0.8055 | 0.8419 | 0.6572 | 0.5588 | 0.6040 | 0.4790 |
+| Decision Tree | 0.7984 | 0.8281 | 0.6347 | 0.5668 | 0.5989 | 0.4662 |
+| KNN | 0.7637 | 0.7896 | 0.5527 | 0.5749 | 0.5636 | 0.4018 |
+| Naive Bayes | 0.6948 | 0.8074 | 0.4589 | 0.8369 | 0.5928 | 0.4245 |
+| Support Vector Machine (SVM) | 0.7913 | 0.7905 | 0.6418 | 0.4840 | 0.5518 | 0.4264 |
+
+Observations on the performance of each model on the chosen dataset. 
+
+| ML Model Name | Observation about Model Performance |
+|---|---|
+| Logistic Regression | Logistic Regression achieved the best overall performance among the five models, with the highest Accuracy (80.55%), AUC (0.8419), F1-score (0.6040), and MCC (0.4790). It provides a good balance between identifying customers likely to churn and making correct churn predictions. Its Recall of 55.88% indicates that it identifies slightly more than half of the actual churn customers. Overall, it is the most balanced and reliable model for this dataset. |
+| Decision Tree | Decision Tree achieved an Accuracy of 79.84% and an AUC of 0.8281, making it the second-best model in terms of overall performance. Its Precision (0.6347), Recall (0.5668), and F1-score (0.5989) are reasonably balanced. Its performance is close to Logistic Regression, but it falls slightly behind across the main evaluation metrics. |
+| K-Nearest Neighbors (KNN) | KNN achieved an Accuracy of 76.37% and an AUC of 0.7896. Its Precision (0.5527) and Recall (0.5749) are relatively balanced, but its F1-score (0.5636) and MCC (0.4018) are the lowest among the five models. This indicates that KNN is less effective at distinguishing between customers who churn and those who do not churn compared with the other models. |
+| Naive Bayes | Naive Bayes achieved the highest Recall (0.8369) among all five models, meaning it successfully identifies a large proportion of customers who actually churn. However, its Precision is only 0.4589, indicating that it also incorrectly classifies many non-churning customers as churners. It has the lowest Accuracy (69.48%), but it may be useful when identifying as many potential churn customers as possible is the primary objective. |
+| Support Vector Machine (SVM) | SVM achieved an Accuracy of 79.13% and a Precision of 0.6418, showing that its churn predictions are reasonably accurate. However, its Recall of 0.4840 is the lowest among all five models, meaning it misses a considerable number of actual churn customers. Its overall performance is moderate, with an F1-score of 0.5518 and an MCC of 0.4264. |
+| **Overall Winner for the Dataset** | **Logistic Regression is the best-performing model for the Bank Customer Churn dataset.** It achieved the highest Accuracy (80.55%), AUC (0.8419), F1-score (0.6040), and MCC (0.4790) among all five models. It offers the best overall balance of predictive performance compared with the other classifiers. Although Naive Bayes has a higher Recall, Logistic Regression provides a stronger overall result across the evaluation metrics and is therefore selected as the overall winner for this dataset. |
