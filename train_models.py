@@ -1,6 +1,4 @@
 
-import os
-import warnings
 import joblib
 import numpy as np
 import pandas as pd
@@ -9,8 +7,9 @@ from pathlib import Path
 
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -20,21 +19,19 @@ from sklearn.svm import LinearSVC
 
 from sklearn.metrics import (
     accuracy_score,
-    roc_auc_score,
     precision_score,
     recall_score,
     f1_score,
+    roc_auc_score,
     matthews_corrcoef,
     confusion_matrix,
     classification_report
 )
 
-warnings.filterwarnings("ignore")
 
-
-# --------------------------------------------------
-# 1. PROJECT PATHS AND DATASET URLS
-# --------------------------------------------------
+# ============================================================
+# 1. PROJECT PATHS AND DATASET URL
+# ============================================================
 
 ROOT_DIR = Path(__file__).resolve().parent
 MODEL_DIR = ROOT_DIR / "models"
@@ -42,15 +39,8 @@ MODEL_DIR = ROOT_DIR / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 TRAIN_DATA_URL = (
-    "https://huggingface.co/datasets/"
-    "drukeroni/airline-satisfaction-analysis/"
-    "resolve/main/train.csv"
-)
-
-TEST_DATA_URL = (
-    "https://huggingface.co/datasets/"
-    "drukeroni/airline-satisfaction-analysis/"
-    "resolve/main/test.csv"
+    "https://huggingface.co/datasets/drukeroni/"
+    "airline-satisfaction-analysis/resolve/main/train.csv"
 )
 
 TARGET_COLUMN = "satisfaction"
@@ -66,379 +56,392 @@ CLASS_NAMES = [
 ]
 
 
-# --------------------------------------------------
-# 2. LOAD TRAINING AND TEST DATA
-# --------------------------------------------------
+# ============================================================
+# 2. LOAD THE TRAINING DATASET
+# ============================================================
 
-print("\nLoading Airline Passenger Satisfaction datasets...")
+print("\nLoading Airline Passenger Satisfaction dataset...")
 
 try:
-    train_df = pd.read_csv(TRAIN_DATA_URL)
-    test_df = pd.read_csv(TEST_DATA_URL)
+    df = pd.read_csv(TRAIN_DATA_URL)
 
 except Exception as error:
     raise RuntimeError(
-        "Unable to download the Airline datasets. "
-        "Check your internet connection and dataset URLs."
+        "Unable to download the training dataset. "
+        "Check your internet connection and dataset URL."
     ) from error
 
-print("\nDatasets loaded successfully!")
-print("Training dataset shape:", train_df.shape)
-print("Testing dataset shape:", test_df.shape)
+print("\nDataset loaded successfully!")
+print("Original dataset shape:", df.shape)
 
 
-# --------------------------------------------------
+# ============================================================
 # 3. CLEAN COLUMN NAMES
-# --------------------------------------------------
+# ============================================================
 
-def clean_column_names(df):
-    df = df.copy()
-
-    df.columns = (
-        df.columns
-        .astype(str)
-        .str.replace("\ufeff", "", regex=False)
-        .str.strip()
-    )
-
-    return df
-
-
-train_df = clean_column_names(train_df)
-test_df = clean_column_names(test_df)
-
-
-# --------------------------------------------------
-# 4. VALIDATE THE DATASETS
-# --------------------------------------------------
-
-if TARGET_COLUMN not in train_df.columns:
-    raise ValueError(
-        f"Training dataset does not contain '{TARGET_COLUMN}'. "
-        f"Available columns: {train_df.columns.tolist()}"
-    )
-
-if TARGET_COLUMN not in test_df.columns:
-    raise ValueError(
-        f"Test dataset does not contain '{TARGET_COLUMN}'. "
-        f"Available columns: {test_df.columns.tolist()}"
-    )
-
-# Remove columns that are not useful for prediction.
-# These are dataset index/identifier columns, not passenger features.
-
-columns_to_drop = ["id", "Unnamed: 0"]
-
-train_df = train_df.drop(
-    columns=columns_to_drop,
-    errors="ignore"
-)
-
-test_df = test_df.drop(
-    columns=columns_to_drop,
-    errors="ignore"
+df.columns = (
+    df.columns
+    .astype(str)
+    .str.replace("\ufeff", "", regex=False)
+    .str.strip()
 )
 
 
-# --------------------------------------------------
-# 5. PREPARE THE TARGET COLUMN
-# --------------------------------------------------
+# ============================================================
+# 4. VALIDATE AND PREPARE THE DATASET
+# ============================================================
 
-def encode_target(series):
-    cleaned = series.astype(str).str.strip().str.lower()
-
-    encoded = cleaned.map(TARGET_MAPPING)
-
-    if encoded.isna().any():
-        unknown_values = cleaned[encoded.isna()].unique().tolist()
-
-        raise ValueError(
-            "Unexpected values found in the satisfaction column: "
-            f"{unknown_values}"
-        )
-
-    return encoded.astype(int)
-
-
-y_train = encode_target(train_df[TARGET_COLUMN])
-y_test = encode_target(test_df[TARGET_COLUMN])
-
-
-# --------------------------------------------------
-# 6. PREPARE THE FEATURE COLUMNS
-# --------------------------------------------------
-
-X_train = train_df.drop(columns=[TARGET_COLUMN])
-X_test = test_df.drop(columns=[TARGET_COLUMN])
-
-# Make sure both datasets have the same features.
-missing_in_test = set(X_train.columns) - set(X_test.columns)
-extra_in_test = set(X_test.columns) - set(X_train.columns)
-
-if missing_in_test or extra_in_test:
+if TARGET_COLUMN not in df.columns:
     raise ValueError(
-        "Training and testing feature columns do not match.\n"
-        f"Missing in test dataset: {sorted(missing_in_test)}\n"
-        f"Extra in test dataset: {sorted(extra_in_test)}"
+        f"Target column '{TARGET_COLUMN}' not found in dataset."
     )
 
-# Keep the test features in exactly the same order as training.
-X_test = X_test[X_train.columns]
+# Remove identifier columns, if present.
+df = df.drop(
+    columns=["id", "Unnamed: 0"],
+    errors="ignore"
+)
 
-print("\nFeature preparation completed.")
-print("Number of features:", X_train.shape[1])
-print("Training feature shape:", X_train.shape)
-print("Testing feature shape:", X_test.shape)
+# Convert target labels into binary values.
+target_values = (
+    df[TARGET_COLUMN]
+    .astype(str)
+    .str.strip()
+    .str.lower()
+)
 
-print("\nTraining target distribution:")
-print(y_train.value_counts().rename(index={
-    0: CLASS_NAMES[0],
-    1: CLASS_NAMES[1]
-}))
+y = target_values.map(TARGET_MAPPING)
 
-print("\nTesting target distribution:")
-print(y_test.value_counts().rename(index={
-    0: CLASS_NAMES[0],
-    1: CLASS_NAMES[1]
-}))
+if y.isna().any():
+    unknown_values = target_values[y.isna()].unique().tolist()
+
+    raise ValueError(
+        "Unexpected values found in the satisfaction column: "
+        f"{unknown_values}"
+    )
+
+y = y.astype(int)
+
+# Separate input features and target.
+X = df.drop(columns=[TARGET_COLUMN])
+
+print("\nDataset preparation completed!")
+print("Total records:", len(X))
+print("Number of input features:", X.shape[1])
+
+print("\nTarget distribution:")
+print(
+    y.value_counts()
+    .rename(index={
+        0: CLASS_NAMES[0],
+        1: CLASS_NAMES[1]
+    })
+)
+
+print("\nTarget distribution in percentage:")
+print(
+    (y.value_counts(normalize=True) * 100)
+    .round(2)
+)
 
 
-# --------------------------------------------------
-# 7. IDENTIFY NUMERIC AND CATEGORICAL FEATURES
-# --------------------------------------------------
+# ============================================================
+# 5. SPLIT THE DATASET INTO TRAINING AND TESTING DATA
+# ============================================================
+
+# Use 80% for training and 20% for testing.
+# Stratification preserves the original class distribution.
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.20,
+    random_state=42,
+    stratify=y
+)
+
+print("\nDataset split completed!")
+
+print("Training records:", len(X_train))
+print("Testing records:", len(X_test))
+
+print(
+    "Training satisfaction rate:",
+    round(y_train.mean() * 100, 2),
+    "%"
+)
+
+print(
+    "Testing satisfaction rate:",
+    round(y_test.mean() * 100, 2),
+    "%"
+)
+
+
+# ============================================================
+# 6. IDENTIFY NUMERICAL AND CATEGORICAL FEATURES
+# ============================================================
 
 numeric_features = X_train.select_dtypes(
-    include=["int64", "float64", "int32", "float32"]
+    include=["number"]
 ).columns.tolist()
 
 categorical_features = X_train.select_dtypes(
     include=["object", "category", "bool"]
 ).columns.tolist()
 
-print("\nNumeric features:", len(numeric_features))
-print("Categorical features:", len(categorical_features))
+print("\nNumerical features:", numeric_features)
+print("\nCategorical features:", categorical_features)
 
 
-# --------------------------------------------------
-# 8. BUILD THE PREPROCESSING PIPELINE
-# --------------------------------------------------
+# ============================================================
+# 7. CREATE PREPROCESSING PIPELINE
+# ============================================================
 
-numeric_transformer = Pipeline(
-    steps=[
-        (
-            "imputer",
-            SimpleImputer(strategy="median")
-        ),
-        (
-            "scaler",
-            StandardScaler()
-        )
-    ]
-)
+def create_preprocessor():
 
-categorical_transformer = Pipeline(
-    steps=[
-        (
-            "imputer",
-            SimpleImputer(strategy="most_frequent")
-        ),
-        (
-            "onehot",
-            OneHotEncoder(handle_unknown="ignore")
-        )
-    ]
-)
+    numeric_pipeline = Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("scaler", StandardScaler())
+    ])
 
-preprocessor = ColumnTransformer(
-    transformers=[
-        (
-            "numeric",
-            numeric_transformer,
-            numeric_features
-        ),
-        (
-            "categorical",
-            categorical_transformer,
-            categorical_features
-        )
-    ],
-    sparse_threshold=0
-)
+    categorical_pipeline = Pipeline([
+        ("imputer", SimpleImputer(strategy="most_frequent")),
+        ("encoder", OneHotEncoder(handle_unknown="ignore"))
+    ])
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            (
+                "numeric",
+                numeric_pipeline,
+                numeric_features
+            ),
+            (
+                "categorical",
+                categorical_pipeline,
+                categorical_features
+            )
+        ],
+        sparse_threshold=0
+    )
+
+    return preprocessor
 
 
-# --------------------------------------------------
-# 9. DEFINE THE FIVE CLASSIFIERS
-# --------------------------------------------------
+# ============================================================
+# 8. COMMON MODEL EVALUATION FUNCTION
+# ============================================================
 
-classifiers = {
-    "Logistic Regression": LogisticRegression(
+def evaluate_and_save_model(
+    classifier,
+    model_name,
+    file_name
+):
+
+    print("\n" + "=" * 65)
+    print(f"{model_name.upper()} RESULTS")
+    print("=" * 65)
+
+    # Create an independent preprocessing pipeline
+    # for each classifier.
+
+    model_pipeline = Pipeline([
+        ("preprocessor", create_preprocessor()),
+        ("classifier", classifier)
+    ])
+
+    # Train using only the training portion.
+    model_pipeline.fit(X_train, y_train)
+
+    print(f"\n{model_name} training completed.")
+
+    # Generate predictions on the held-out test portion.
+    y_pred = model_pipeline.predict(X_test)
+
+    # Obtain scores for AUC calculation.
+    if hasattr(model_pipeline, "predict_proba"):
+        y_score = model_pipeline.predict_proba(X_test)[:, 1]
+
+    elif hasattr(model_pipeline, "decision_function"):
+        y_score = model_pipeline.decision_function(X_test)
+
+    else:
+        y_score = None
+
+    # Calculate evaluation metrics.
+    accuracy = accuracy_score(y_test, y_pred)
+
+    auc = (
+        roc_auc_score(y_test, y_score)
+        if y_score is not None
+        else np.nan
+    )
+
+    precision = precision_score(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+
+    recall = recall_score(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+
+    f1 = f1_score(
+        y_test,
+        y_pred,
+        zero_division=0
+    )
+
+    mcc = matthews_corrcoef(y_test, y_pred)
+
+    metrics = {
+        "Accuracy": accuracy,
+        "AUC": auc,
+        "Precision": precision,
+        "Recall": recall,
+        "F1 Score": f1,
+        "MCC": mcc
+    }
+
+    print("\nEvaluation Metrics:")
+
+    for metric_name, metric_value in metrics.items():
+        print(f"{metric_name}: {metric_value:.4f}")
+
+    # Confusion matrix.
+    matrix = confusion_matrix(
+        y_test,
+        y_pred,
+        labels=[0, 1]
+    )
+
+    print("\nConfusion Matrix:")
+    print(matrix)
+
+    # Classification report.
+    report = classification_report(
+        y_test,
+        y_pred,
+        labels=[0, 1],
+        target_names=CLASS_NAMES,
+        zero_division=0
+    )
+
+    print("\nClassification Report:")
+    print(report)
+
+    # Save the complete trained pipeline.
+    model_path = MODEL_DIR / file_name
+
+    joblib.dump(
+        model_pipeline,
+        model_path
+    )
+
+    print(f"\nSaved model: {model_path}")
+
+    # Return evaluation results.
+    return {
+        "Model": model_name,
+        **metrics
+    }
+
+
+# ============================================================
+# 9. LOGISTIC REGRESSION
+# ============================================================
+
+logistic_results = evaluate_and_save_model(
+    LogisticRegression(
         max_iter=1000,
         solver="liblinear",
         random_state=42
     ),
+    "Logistic Regression",
+    "logistic_regression.joblib"
+)
 
-    "Decision Tree": DecisionTreeClassifier(
+
+# ============================================================
+# 10. DECISION TREE
+# ============================================================
+
+decision_tree_results = evaluate_and_save_model(
+    DecisionTreeClassifier(
         criterion="gini",
         max_depth=5,
         min_samples_split=10,
         min_samples_leaf=5,
         random_state=42
     ),
+    "Decision Tree",
+    "decision_tree.joblib"
+)
 
-    "K-Nearest Neighbors": KNeighborsClassifier(
+
+# ============================================================
+# 11. K-NEAREST NEIGHBORS
+# ============================================================
+
+knn_results = evaluate_and_save_model(
+    KNeighborsClassifier(
         n_neighbors=5,
         weights="uniform",
         metric="minkowski",
         p=2
     ),
+    "K-Nearest Neighbors",
+    "k-nearest_neighbors.joblib"
+)
 
-    "Naive Bayes": GaussianNB(),
 
-    "Support Vector Machine": LinearSVC(
+# ============================================================
+# 12. GAUSSIAN NAIVE BAYES
+# ============================================================
+
+naive_bayes_results = evaluate_and_save_model(
+    GaussianNB(),
+    "Naive Bayes",
+    "naive_bayes.joblib"
+)
+
+
+# ============================================================
+# 13. SUPPORT VECTOR MACHINE
+# ============================================================
+
+svm_results = evaluate_and_save_model(
+    LinearSVC(
         C=1.0,
         max_iter=5000,
         random_state=42
-    )
-}
+    ),
+    "Support Vector Machine",
+    "support_vector_machine.joblib"
+)
 
 
-# --------------------------------------------------
-# 10. EVALUATE A TRAINED MODEL
-# --------------------------------------------------
+# ============================================================
+# 14. FINAL MODEL COMPARISON
+# ============================================================
 
-def evaluate_model(model, X, y):
-    predictions = model.predict(X)
-
-    # Calculate AUC using probabilities when available.
-    if hasattr(model, "predict_proba"):
-        probabilities = model.predict_proba(X)[:, 1]
-
-    # LinearSVC does not provide predict_proba().
-    # Its decision_function can be used to calculate ROC AUC.
-    elif hasattr(model, "decision_function"):
-        probabilities = model.decision_function(X)
-
-    else:
-        probabilities = None
-
-    auc = (
-        roc_auc_score(y, probabilities)
-        if probabilities is not None
-        else np.nan
-    )
-
-    metrics = {
-        "Accuracy": accuracy_score(y, predictions),
-        "AUC": auc,
-        "Precision": precision_score(
-            y, predictions, zero_division=0
-        ),
-        "Recall": recall_score(
-            y, predictions, zero_division=0
-        ),
-        "F1 Score": f1_score(
-            y, predictions, zero_division=0
-        ),
-        "MCC": matthews_corrcoef(y, predictions)
-    }
-
-    matrix = confusion_matrix(
-        y,
-        predictions,
-        labels=[0, 1]
-    )
-
-    report = classification_report(
-        y,
-        predictions,
-        labels=[0, 1],
-        target_names=CLASS_NAMES,
-        zero_division=0
-    )
-
-    return metrics, matrix, report
-
-
-# --------------------------------------------------
-# 11. TRAIN AND EVALUATE ALL FIVE MODELS
-# --------------------------------------------------
-
-results = []
-
-print("\n" + "=" * 65)
-print("STARTING MODEL TRAINING")
-print("=" * 65)
-
-for model_name, classifier in classifiers.items():
-
-    print(f"\nTraining {model_name}...")
-
-    model_pipeline = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            ("classifier", classifier)
-        ]
-    )
-
-    # Train only on the training dataset.
-    model_pipeline.fit(X_train, y_train)
-
-    print(f"{model_name} training completed.")
-
-    # Evaluate using the separate test dataset.
-    metrics, matrix, report = evaluate_model(
-        model_pipeline,
-        X_test,
-        y_test
-    )
-
-    # Save the trained model.
-    model_filename = (
-        model_name.lower()
-        .replace(" ", "_")
-        + ".joblib"
-    )
-
-    model_path = MODEL_DIR / model_filename
-
-    joblib.dump(model_pipeline, model_path)
-
-    print(f"Saved model: {model_path}")
-
-    print("\nEvaluation metrics:")
-    for metric_name, metric_value in metrics.items():
-        print(f"{metric_name}: {metric_value:.4f}")
-
-    print("\nConfusion Matrix:")
-    print(matrix)
-
-    print("\nClassification Report:")
-    print(report)
-
-    result_row = {
-        "Model": model_name,
-        **metrics
-    }
-
-    results.append(result_row)
-
-
-# --------------------------------------------------
-# 12. SAVE MODEL COMPARISON RESULTS
-# --------------------------------------------------
+results = [
+    logistic_results,
+    decision_tree_results,
+    knn_results,
+    naive_bayes_results,
+    svm_results
+]
 
 results_df = pd.DataFrame(results)
 
-results_path = MODEL_DIR / "model_comparison_results.csv"
-
-results_df.to_csv(
-    results_path,
-    index=False
-)
-
-print("\n" + "=" * 65)
-print("MODEL COMPARISON")
-print("=" * 65)
+print("\n" + "=" * 90)
+print("FINAL COMPARISON OF ALL FIVE CLASSIFICATION MODELS")
+print("=" * 90)
 
 print(
     results_df.to_string(
@@ -447,16 +450,32 @@ print(
     )
 )
 
+
+# ============================================================
+# 15. SAVE MODEL COMPARISON RESULTS
+# ============================================================
+
+results_path = MODEL_DIR / "model_comparison_results.csv"
+
+results_df.to_csv(
+    results_path,
+    index=False
+)
+
 print("\nModel comparison saved to:", results_path)
 
 
-# --------------------------------------------------
-# 13. COMPLETION MESSAGE
-# --------------------------------------------------
+# ============================================================
+# 16. COMPLETION MESSAGE
+# ============================================================
 
 print("\n" + "=" * 65)
 print("ALL FIVE MODELS TRAINED AND SAVED SUCCESSFULLY!")
 print("=" * 65)
+
+print("\nTraining dataset split:")
+print("80% - Model training")
+print("20% - Model evaluation")
 
 print("\nSaved model files:")
 
