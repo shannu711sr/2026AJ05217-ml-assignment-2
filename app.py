@@ -546,7 +546,7 @@ def display_training_metrics(model_name):
             "AUC": "AUC",
             "Precision": "Precision",
             "Recall": "Recall",
-            "F1 Score": "F1",
+            "F1 Score": "F1 Score",
             "MCC": "MCC",
         }
 
