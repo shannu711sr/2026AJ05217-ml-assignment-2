@@ -685,9 +685,9 @@ st.markdown(
     """
 )
 
-st.info(
+st.markdown(
     "No model training or retraining takes place in this application. "
-    "The application uses previously saved models."
+    "The application uses previously trained models."
 )
 
 
