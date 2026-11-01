@@ -1,4 +1,3 @@
-
 import joblib
 import numpy as np
 import pandas as pd
@@ -8,7 +7,11 @@ from pathlib import Path
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import (
+    OneHotEncoder,
+    StandardScaler,
+    PolynomialFeatures
+)
 from sklearn.model_selection import train_test_split
 
 from sklearn.linear_model import LogisticRegression
@@ -28,11 +31,7 @@ from sklearn.metrics import (
     classification_report
 )
 
-
-# ============================================================
-# 1. PROJECT PATHS AND DATASET URL
-# ============================================================
-
+#  Data set from URL 
 ROOT_DIR = Path(__file__).resolve().parent
 MODEL_DIR = ROOT_DIR / "models"
 
@@ -55,11 +54,7 @@ CLASS_NAMES = [
     "Satisfied"
 ]
 
-
-# ============================================================
-# 2. LOAD THE TRAINING DATASET
-# ============================================================
-
+#  Load the training data
 print("\nLoading Airline Passenger Satisfaction dataset...")
 
 try:
@@ -67,18 +62,15 @@ try:
 
 except Exception as error:
     raise RuntimeError(
-        "Unable to download the training dataset. "
-        "Check your internet connection and dataset URL."
+        "Unable to download the training dataset "
+        "Check your internet connection and dataset URL"
     ) from error
 
 print("\nDataset loaded successfully!")
 print("Original dataset shape:", df.shape)
 
 
-# ============================================================
-# 3. CLEAN COLUMN NAMES
-# ============================================================
-
+#  Cleaning columns
 df.columns = (
     df.columns
     .astype(str)
@@ -86,23 +78,19 @@ df.columns = (
     .str.strip()
 )
 
-
-# ============================================================
-# 4. VALIDATE AND PREPARE THE DATASET
-# ============================================================
-
+#  preparing testdata
 if TARGET_COLUMN not in df.columns:
     raise ValueError(
         f"Target column '{TARGET_COLUMN}' not found in dataset."
     )
 
-# Remove identifier columns, if present.
+# Remove identifier columns, if present
 df = df.drop(
     columns=["id", "Unnamed: 0"],
     errors="ignore"
 )
 
-# Convert target labels into binary values.
+# Convert target labels into binary values
 target_values = (
     df[TARGET_COLUMN]
     .astype(str)
@@ -122,10 +110,10 @@ if y.isna().any():
 
 y = y.astype(int)
 
-# Separate input features and target.
+# Separate input features and target
 X = df.drop(columns=[TARGET_COLUMN])
 
-print("\nDataset preparation completed!")
+print("\nDataset preparation completed")
 print("Total records:", len(X))
 print("Number of input features:", X.shape[1])
 
@@ -144,14 +132,7 @@ print(
     .round(2)
 )
 
-
-# ============================================================
-# 5. SPLIT THE DATASET INTO TRAINING AND TESTING DATA
-# ============================================================
-
-# Use 80% for training and 20% for testing.
-# Stratification preserves the original class distribution.
-
+#  Splitting Data sets to Training and testing data
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
@@ -177,11 +158,7 @@ print(
     "%"
 )
 
-
-# ============================================================
-# 6. IDENTIFY NUMERICAL AND CATEGORICAL FEATURES
-# ============================================================
-
+#  Separating Numerical and categorical feature s
 numeric_features = X_train.select_dtypes(
     include=["number"]
 ).columns.tolist()
@@ -193,23 +170,63 @@ categorical_features = X_train.select_dtypes(
 print("\nNumerical features:", numeric_features)
 print("\nCategorical features:", categorical_features)
 
+#  Preprocessing based on model
+def create_preprocessor(model_type):
 
-# ============================================================
-# 7. CREATE PREPROCESSING PIPELINE
-# ============================================================
+    # Logistic Regression and SVM
+    if model_type in ["logistic", "svm"]:
 
-def create_preprocessor():
+        numeric_pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
 
-    numeric_pipeline = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler", StandardScaler())
-    ])
+            ("scaler_before_polynomial", StandardScaler()),
 
+            ("polynomial", PolynomialFeatures(
+                degree=2,
+                include_bias=False
+            )),
+
+            ("scaler_after_polynomial", StandardScaler())
+        ])
+
+    #  KNN
+    elif model_type == "knn":
+
+        numeric_pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+
+            ("scaler", StandardScaler())
+        ])
+
+    # Decision Tree
+    elif model_type == "decision_tree":
+
+        numeric_pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="median"))
+        ])
+
+    #  Naive Bayes
+    elif model_type == "naive_bayes":
+
+        numeric_pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="median"))
+        ])
+
+    else:
+        raise ValueError(
+            f"Unknown preprocessing configuration: {model_type}"
+        )
+    
+# Common Caterorical processing
     categorical_pipeline = Pipeline([
         ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("encoder", OneHotEncoder(handle_unknown="ignore"))
+
+        ("encoder", OneHotEncoder(
+            handle_unknown="ignore"
+        ))
     ])
 
+    # Numerical and Categorical Prepocessing
     preprocessor = ColumnTransformer(
         transformers=[
             (
@@ -223,50 +240,60 @@ def create_preprocessor():
                 categorical_features
             )
         ],
+
+        # Dense output is required by GaussianNB
+        # Using dense output consistently also makes
+        # the pipeline behaviour predictable
         sparse_threshold=0
     )
 
     return preprocessor
 
 
-# ============================================================
-# 8. COMMON MODEL EVALUATION FUNCTION
-# ============================================================
-
+# Evaluate function
 def evaluate_and_save_model(
     classifier,
     model_name,
-    file_name
+    file_name,
+    preprocessing_type
 ):
 
     print("\n" + "=" * 65)
     print(f"{model_name.upper()} RESULTS")
     print("=" * 65)
 
-    # Create an independent preprocessing pipeline
-    # for each classifier.
+    print("\nPreprocessing configuration:", preprocessing_type)
+
+    # Create an independent preprocessing pipeline for each classifier
 
     model_pipeline = Pipeline([
-        ("preprocessor", create_preprocessor()),
+        (
+            "preprocessor",
+            create_preprocessor(preprocessing_type)
+        ),
+
         ("classifier", classifier)
     ])
 
-    # Train using only the training portion.
+    # Train using only the training portion
     model_pipeline.fit(X_train, y_train)
 
     print(f"\n{model_name} training completed.")
 
-    # Generate predictions on the held-out test portion.
+    # Generate predictions on the held-out test portion
     y_pred = model_pipeline.predict(X_test)
 
-    # Obtain scores for AUC calculation.
+    # Obtain scores for AUC calculation
     if hasattr(model_pipeline, "predict_proba"):
+
         y_score = model_pipeline.predict_proba(X_test)[:, 1]
 
     elif hasattr(model_pipeline, "decision_function"):
+
         y_score = model_pipeline.decision_function(X_test)
 
     else:
+
         y_score = None
 
     # Calculate evaluation metrics.
@@ -312,7 +339,7 @@ def evaluate_and_save_model(
     for metric_name, metric_value in metrics.items():
         print(f"{metric_name}: {metric_value:.4f}")
 
-    # Confusion matrix.
+    # Confusion matrix
     matrix = confusion_matrix(
         y_test,
         y_pred,
@@ -322,7 +349,7 @@ def evaluate_and_save_model(
     print("\nConfusion Matrix:")
     print(matrix)
 
-    # Classification report.
+    # Classification report
     report = classification_report(
         y_test,
         y_pred,
@@ -334,7 +361,7 @@ def evaluate_and_save_model(
     print("\nClassification Report:")
     print(report)
 
-    # Save the complete trained pipeline.
+    # Save the complete trained pipeline
     model_path = MODEL_DIR / file_name
 
     joblib.dump(
@@ -344,32 +371,30 @@ def evaluate_and_save_model(
 
     print(f"\nSaved model: {model_path}")
 
-    # Return evaluation results.
+    # Return  results
     return {
         "Model": model_name,
+        "Preprocessing": preprocessing_type,
         **metrics
     }
 
 
-# ============================================================
-# 9. LOGISTIC REGRESSION
-# ============================================================
-
+#  Logistic Regresssion
 logistic_results = evaluate_and_save_model(
     LogisticRegression(
-        max_iter=1000,
+        max_iter=2000,
         solver="liblinear",
         random_state=42
     ),
+
     "Logistic Regression",
-    "logistic_regression.joblib"
+
+    "logistic_regression.joblib",
+
+    "logistic"
 )
 
-
-# ============================================================
-# 10. DECISION TREE
-# ============================================================
-
+# Decision Tree
 decision_tree_results = evaluate_and_save_model(
     DecisionTreeClassifier(
         criterion="gini",
@@ -378,15 +403,15 @@ decision_tree_results = evaluate_and_save_model(
         min_samples_leaf=5,
         random_state=42
     ),
+
     "Decision Tree",
-    "decision_tree.joblib"
+
+    "decision_tree.joblib",
+
+    "decision_tree"
 )
 
-
-# ============================================================
-# 11. K-NEAREST NEIGHBORS
-# ============================================================
-
+#  KNN
 knn_results = evaluate_and_save_model(
     KNeighborsClassifier(
         n_neighbors=5,
@@ -394,41 +419,43 @@ knn_results = evaluate_and_save_model(
         metric="minkowski",
         p=2
     ),
+
     "K-Nearest Neighbors",
-    "k-nearest_neighbors.joblib"
+
+    "k-nearest_neighbors.joblib",
+
+    "knn"
 )
 
 
-# ============================================================
-# 12. GAUSSIAN NAIVE BAYES
-# ============================================================
-
+#  Gaussian NB
 naive_bayes_results = evaluate_and_save_model(
     GaussianNB(),
+
     "Naive Bayes",
-    "naive_bayes.joblib"
+
+    "naive_bayes.joblib",
+
+    "naive_bayes"
 )
 
-
-# ============================================================
-# 13. SUPPORT VECTOR MACHINE
-# ============================================================
-
+# SVM
 svm_results = evaluate_and_save_model(
     LinearSVC(
         C=1.0,
-        max_iter=5000,
+        max_iter=10000,
         random_state=42
     ),
+
     "Support Vector Machine",
-    "support_vector_machine.joblib"
+
+    "support_vector_machine.joblib",
+
+    "svm"
 )
 
 
-# ============================================================
-# 14. FINAL MODEL COMPARISON
-# ============================================================
-
+# Model comparision
 results = [
     logistic_results,
     decision_tree_results,
@@ -439,9 +466,9 @@ results = [
 
 results_df = pd.DataFrame(results)
 
-print("\n" + "=" * 90)
+print("\n" + "=" * 110)
 print("FINAL COMPARISON OF ALL FIVE CLASSIFICATION MODELS")
-print("=" * 90)
+print("=" * 110)
 
 print(
     results_df.to_string(
@@ -450,11 +477,7 @@ print(
     )
 )
 
-
-# ============================================================
-# 15. SAVE MODEL COMPARISON RESULTS
-# ============================================================
-
+# Save the model comparision results to view in the app
 results_path = MODEL_DIR / "model_comparison_results.csv"
 
 results_df.to_csv(
@@ -462,24 +485,5 @@ results_df.to_csv(
     index=False
 )
 
-print("\nModel comparison saved to:", results_path)
+print("\nModel comparison saved for displaying in app")
 
-
-# ============================================================
-# 16. COMPLETION MESSAGE
-# ============================================================
-
-print("\n" + "=" * 65)
-print("ALL FIVE MODELS TRAINED AND SAVED SUCCESSFULLY!")
-print("=" * 65)
-
-print("\nTraining dataset split:")
-print("80% - Model training")
-print("20% - Model evaluation")
-
-print("\nSaved model files:")
-
-for file_path in sorted(MODEL_DIR.glob("*.joblib")):
-    print("-", file_path.name)
-
-print("\nYou can now run your Streamlit application.")
