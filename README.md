@@ -198,20 +198,6 @@ It achieved the highest Accuracy (93.74%), F1-score (0.9272), and MCC (0.8724) a
 
 Although Logistic Regression achieved a marginally higher AUC of 0.9823, SVM performed better in Accuracy, Precision, Recall, F1-score, and MCC. Therefore, SVM is selected as the overall winner based on its performance across the evaluation metrics.
 
-### Overall Conclusion
-
-This project implements five machine learning classification algorithms to predict airline passenger satisfaction.
-
-The models are evaluated using multiple performance metrics to understand their strengths and weaknesses. Model-specific preprocessing and feature engineering techniques were applied to improve the suitability of the input data for each classification algorithm.
-
-The results show that **Support Vector Machine (SVM) achieved the best overall performance**, with an Accuracy of 93.74%, an F1-score of 0.9272, and an MCC of 0.8724. It also achieved a strong AUC of 0.9822 and Recall of 0.9194.
-
-Logistic Regression also demonstrated excellent performance, achieving an Accuracy of 93.60% and the highest AUC of 0.9823. K-Nearest Neighbors achieved the highest Precision of 0.9423, while Decision Tree delivered an Accuracy of 90.69%. Gaussian Naive Bayes recorded the lowest overall performance among the five classifiers.
-
 The introduction of polynomial feature engineering for Logistic Regression and SVM improved their ability to capture relationships between numerical features, resulting in stronger classification performance.
 
 Based on the latest evaluation results, SVM is selected as the overall winner for this dataset.
-
-The Streamlit application provides an interactive interface where users can view the saved training evaluation metrics, select different classifiers, and evaluate uploaded labelled CSV datasets using the previously trained models.
-
-The application uses saved models and does not perform model training or retraining during evaluation.
